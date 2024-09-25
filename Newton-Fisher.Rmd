@@ -1,0 +1,208 @@
+---
+title: "Logistic Regression: Newton's Method, Fisher Scoring, and Optim"
+output: html_document
+date: "2024-09-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  Introduction
+In this document, we will cover how to perform logistic regression using **Newton's method**, and **Fisher scoring** methods in R. We will also compare the results to R's built-in `glm` function. 
+
+The logistic regression model is defined as follows:
+
+$$
+p(\mathbf{x}) = \frac{1}{1 + \exp\left(-(\beta_0 + \beta_1 x)\right)}
+$$
+
+where:
+
+ \( p(\mathbf{x}) \) is the probability of the outcome.
+ 
+ \( \beta_0 \) is the intercept.
+ 
+ \( \beta_1 \) is the coefficient for the predictor \( x \), here \( x \) is the income.
+
+
+# Simulated Data
+
+```{r}
+set.seed(42)
+X <- cbind(1, matrix(rnorm(100 * 5), nrow = 100))  # Design matrix with intercept and 5 predictors
+y <- rbinom(100, 1, prob = 1 / (1 + exp(-X %*% c(-1, 0.5, -0.2, 1, 0.8, -0.3))))  # Simulated binary response
+```
+
+# Newton's Method for Logistic Regression
+
+Newton's method is an iterative optimization technique used to find the maximum likelihood estimates (MLE) for the parameters $\beta_0$,  $\beta_1$, $\beta_2$, $\beta_3$, $\beta_4$, and $\beta_5$. Given an initial estimate $\beta^{(k)}$, the next estimate is given by:
+
+$$
+\beta^{(k+1)}=\beta^{(k)}-(J(l)\left(\beta^{(k)}\right))^{-1} \nabla l\left(\beta^{(k)}\right)
+$$
+
+where
+
+ \(H(\beta) \) is the Hessian matrix (second-order partial derivatives).
+ 
+ \(\nabla l(\beta) \) is the gradient of the log-likelihood.
+
+# Log-likelihood Function:
+
+The log-likelihood for logistic regression is given by:
+
+$$
+l(\beta)=\sum_{i=1}^n\left[y_i \log \left(p_i\right)+\left(1-y_i\right) \log \left(1-p_i\right)\right]
+$$
+
+where $p_i$ is the predicted probability for observation $i$.
+
+
+
+
+```{r}
+# Log-likelihood function
+log_likelihood <- function(beta, X, y) {
+  p <- 1 / (1 + exp(-(X %*% beta)))
+  return(sum(y * log(p) + (1 - y) * log(1 - p)))
+}
+```
+
+# Gradient of the Log-likelihood:
+The gradient is computed as:
+
+$$
+\begin{gathered}
+\frac{\partial l}{\partial \beta_0}=\sum_{i=1}^n\left(y_i-p_i\right) \\
+\frac{\partial l}{\partial \beta_1}=\sum_{i=1}^n X_i\left(y_i-p_i\right)
+\end{gathered}
+$$
+
+
+
+```{r}
+# Gradient of the log-likelihood
+log_likelihood_gradient <- function(beta, X, y) {
+  p <- 1 / (1 + exp(-(X %*% beta)))
+  return(t(X) %*% (y - p))
+}
+```
+# Hessian of the Log-likelihood:
+The Hessian is the matrix of second-order partial derivatives:
+
+$$
+H_{j k}=-\sum_{i=1}^n X_{i j} X_{i k} p_i\left(1-p_i\right)
+$$
+
+
+```{r}
+# Hessian of the log-likelihood
+log_likelihood_hessian <- function(beta, X) {
+  p <- 1 / (1 + exp(-(X %*% beta)))
+  W <- diag(as.vector(p * (1 - p)))
+  return(-t(X) %*% W %*% X)
+}
+```
+
+# Newton's Method Implementation:
+We now use Newton's method to iteratively solve for $\beta_0$ and $\beta_1$ :
+```{r}
+# Newton's method for logistic regression
+newtons_method <- function(X, y, beta_init, tol = 1e-6, max_iter = 100) {
+  beta <- beta_init
+  for (i in 1:max_iter) {
+    grad <- log_likelihood_gradient(beta, X, y)
+    H <- log_likelihood_hessian(beta, X)
+    beta_new <- beta - solve(H) %*% grad
+    if (sum(abs(beta_new - beta)) < tol) {
+      return(beta_new)
+    }
+    beta <- beta_new
+  }
+  warning("Newton's method did not converge")
+  return(beta)
+}
+
+# Apply Newton's method
+beta_init <- rep(0, 6)
+beta_newton <- newtons_method(X, y, beta_init)
+cat("Estimated coefficients:", beta_newton, "\n")
+```
+
+# Fisher Scoring
+
+Fisher scoring is a variation of Newton's method that uses the Fisher Information matrix instead of the Hessian:
+
+$$
+\hat{\beta}^{(k+1)}=\hat{\beta}^{(k)}+I^{-1}\left(\hat{\beta}^{(k)}\right) \nabla l\left(\hat{\beta}^{(k)}\right)
+$$
+
+where $I(\beta)$ is the expected Fisher Information matrix, which replaces the Hessian with its expectation.
+
+In logistic regression, the Fisher Information matrix can be computed as:
+
+$$
+I(\beta)=X^T \mathbf{W} X=-H
+$$
+
+where $\mathbf{W}$ is a diagonal matrix with elements $p_i\left(1-p_i\right)$, and $p_i=\frac{1}{1+\exp \left(-X_i \beta\right)}$ is the predicted probability for the $i$-th data point.
+
+This is effectively the same as the negative Hessian used in Newton's method for logistic regression.
+
+```{r}
+# Fisher scoring method for logistic regression
+fisher_scoring <- function(X, y, beta_init, tol = 1e-6, max_iter = 100) {
+  beta <- beta_init
+  for (i in 1:max_iter) {
+    grad <- log_likelihood_gradient(beta, X, y)
+    Fisher_info <- -log_likelihood_hessian(beta, X)
+    beta_new <- beta + solve(Fisher_info) %*% grad
+    if (sum(abs(beta_new - beta)) < tol) {
+      return(beta_new)
+    }
+    beta <- beta_new
+  }
+  warning("Fisher scoring did not converge")
+  return(beta)
+}
+
+# Apply Fisher scoring
+beta_fisher <- fisher_scoring(X, y, beta_init)
+cat("Estimated coefficients:", beta_fisher, "\n")
+```
+
+# Using optim for Logistic Regression
+
+R's optim function is a general-purpose optimization function. We use it to minimize the negative log-likelihood:
+```{r}
+# Using optim to minimize the negative log-likelihood
+logistic_regression_optim <- function(X, y, beta_init) {
+  optim_result <- optim(
+    par = beta_init,
+    fn = log_likelihood,
+    gr = log_likelihood_gradient,
+    X = X,
+    y = y,
+    method = "BFGS",  # BFGS is a quasi-Newton method
+    control = list(fnscale = -1)  # Minimizes function
+  )
+  return(optim_result$par)  # Return estimated coefficients
+}
+
+# Apply optim for logistic regression
+beta_optim <- logistic_regression_optim(X, y, beta_init)
+cat("Estimated coefficients using optim:", beta_optim, "\n")
+```
+
+# Comparison with g lm
+
+Finally, we compare the results from Newton's method, Fisher scoring, and optim to R's built-in glm function:
+```{r}
+# Compare with glm function
+glm_fit <- glm(y ~ X[, -1] -1, family = binomial())
+summary(glm_fit)
+
+cat("Logistic Regression Coefficients using glm:\n")
+print(coef(glm_fit))
+```
