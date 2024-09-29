@@ -1,0 +1,378 @@
+---
+title: "Numerical Integration Example"
+output: pdf_document
+---
+
+# Numerical Integration Example: \( \int_0^1 \frac{1}{1 + x^2} dx \)
+
+In this example, we will compute the integral of the function \( f(x) = \frac{1}{1 + x^2} \) over the interval \([0, 1]\) using various numerical integration methods: midpoint, trapezoidal, Simpson's, and Legendre-Gaussian quadrature. We will also implement adaptive versions of these methods and compare the results with the true value of the integral, which is \( \frac{\pi}{4} \).
+
+## True Value of the Integral
+
+The true value of the integral is:
+
+\[
+I(f) = \int_0^1 \frac{1}{1 + x^2} dx = \frac{\pi}{4}
+\]
+
+We will compute this in R using the built-in `integrate()` function for comparison.
+
+```{r}
+# Define the function f(x)
+f <- function(x) 1 / (1 + x^2)
+
+# Compute the true value of the integral using R's built-in function
+true_value <- integrate(f, 0, 1)$value
+true_value
+```
+
+## Non-Adaptive Midpoint Rule
+The midpoint rule is a simple numerical integration method that evaluates the function at the midpoints of each subinterval. The approximation formula is:
+
+$$
+M_n=\sum_{i=1}^n f\left(m_i\right) \Delta x
+$$
+
+
+Where $m_i$ is the midpoint of the $i$-th subinterval.
+
+```{r}
+# Non-Adaptive Midpoint Rule
+midpoint_rule <- function(f, a, b, n) {
+  h <- (b - a) / n
+  midpoints <- seq(a + h / 2, b - h / 2, length.out = n)
+  integral <- h * sum(f(midpoints))
+  return(integral)
+}
+
+# Apply the midpoint rule with n = 100 subintervals
+midpoint_non_adaptive <- midpoint_rule(f, 0, 1, 100)
+midpoint_non_adaptive
+```
+
+
+## Adaptive Midpoint Rule
+In the adaptive version, we subdivide intervals where the error estimate is large. The interval is subdivided recursively until the estimated error is below a certain tolerance.
+
+```{r}
+# Adaptive Midpoint Rule
+adaptive_midpoint <- function(f, a, b, tol, max_depth = 10, depth = 0) {
+  h <- (b - a)
+  m <- (a + b) / 2
+  I1 <- h * f((a + b) / 2)
+  I2 <- (h / 2) * (f((a + m) / 2) + f((m + b) / 2))
+  
+  if (depth >= max_depth || abs(I2 - I1) < tol) {
+    return(I2)
+  } else {
+    return(adaptive_midpoint(f, a, m, tol/2, max_depth, depth+1) +
+           adaptive_midpoint(f, m, b, tol/2, max_depth, depth+1))
+  }
+}
+
+# Apply adaptive midpoint with tolerance = 1e-6
+midpoint_adaptive <- adaptive_midpoint(f, 0, 1, tol = 1e-6)
+midpoint_adaptive
+
+```
+
+## Non-Adaptive Trapezoidal Rule
+The trapezoidal rule approximates the area under the curve by connecting points with straight lines. The approximation formula is:
+
+$$
+T_n=\frac{\Delta x}{2}\left(f(a)+2 \sum_{i=1}^{n-1} f\left(x_i\right)+f(b)\right)
+$$
+
+```{r}
+# Non-Adaptive Trapezoidal Rule
+trapezoid_rule <- function(f, a, b, n) {
+  h <- (b - a) / n
+  x <- seq(a, b, length.out = n + 1)
+  y <- f(x)
+  integral <- (h / 2) * (y[1] + 2 * sum(y[2:n]) + y[n+1])
+  return(integral)
+}
+
+# Apply the trapezoidal rule with n = 100 subintervals
+trapezoid_non_adaptive <- trapezoid_rule(f, 0, 1, 100)
+trapezoid_non_adaptive
+```
+
+
+## Adaptive Trapezoidal Rule
+Like the midpoint rule, the adaptive trapezoidal rule subdivides intervals based on an error estimate. It recursively refines the partition of the interval.
+
+```{r}
+# Adaptive Trapezoidal Rule
+adaptive_trapezoid <- function(f, a, b, tol, max_depth = 10, depth = 0) {
+  h <- (b - a) / 2
+  m <- (a + b) / 2
+  I1 <- (b - a) * (f(a) + f(b)) / 2   # Trapezoidal rule
+  I2 <- (m - a) * (f(a) + f(m)) / 2 + (b - m) * (f(m) + f(b)) / 2  # Refined trapezoidal
+  
+  if (depth >= max_depth || abs(I2 - I1) < tol) {
+    return(I2)
+  } else {
+    return(adaptive_trapezoid(f, a, m, tol/2, max_depth, depth+1) + 
+           adaptive_trapezoid(f, m, b, tol/2, max_depth, depth+1))
+  }
+}
+
+# Apply adaptive trapezoid with tolerance = 1e-6
+trapezoid_adaptive <- adaptive_trapezoid(f, 0, 1, tol = 1e-6)
+trapezoid_adaptive
+
+```
+
+
+## Non-Adaptive Simpson's Rule
+Simpson's rule approximates the function using parabolas. The approximation formula is:
+
+$$
+S_n=\frac{\Delta x}{3}\left(f(a)+4 \sum_{\text {odd }} f\left(x_i\right)+2 \sum_{\text {even }} f\left(x_i\right)+f(b)\right)
+$$
+
+```{r}
+# Non-Adaptive Simpson's Rule
+simpson_rule <- function(f, a, b, n) {
+  if (n %% 2 == 1) stop("n must be even for Simpson's rule")
+  h <- (b - a) / n
+  x <- seq(a, b, length.out = n + 1)
+  y <- f(x)
+  integral <- (h / 3) * (y[1] + 4 * sum(y[seq(2, n, 2)]) + 2 * sum(y[seq(3, n - 1, 2)]) + y[n+1])
+  return(integral)
+}
+
+# Apply Simpson's rule with n = 100 subintervals
+simpson_non_adaptive <- simpson_rule(f, 0, 1, 100)
+simpson_non_adaptive
+
+```
+
+
+## Adaptive Simpson's Rule
+The adaptive version of Simpson’s rule recursively subdivides intervals and applies Simpson’s rule on the subintervals.
+
+```{r}
+# Adaptive Simpson's Rule
+adaptive_simpson <- function(f, a, b, tol, max_depth = 10, depth = 0) {
+  h <- (b - a)
+  m <- (a + b) / 2
+  I1 <- h * (f(a) + 4 * f((a + b) / 2) + f(b)) / 6   # Simpson's rule
+  I2 <- (h / 2) * (f(a) + 4 * f((a + m) / 2) + f(m)) / 6 +
+        (h / 2) * (f(m) + 4 * f((m + b) / 2) + f(b)) / 6  # Refined Simpson's
+  
+  if (depth >= max_depth || abs(I2 - I1) < tol) {
+    return(I2)
+  } else {
+    return(adaptive_simpson(f, a, m, tol/2, max_depth, depth+1) + 
+           adaptive_simpson(f, m, b, tol/2, max_depth, depth+1))
+  }
+}
+
+# Apply adaptive Simpson's rule with tolerance = 1e-6
+simpson_adaptive <- adaptive_simpson(f, 0, 1, tol = 1e-6)
+simpson_adaptive
+
+```
+
+
+## Legendre-Gaussian Quadrature
+Gaussian quadrature evaluates the function at specially chosen points (the roots of orthogonal polynomials) and computes the weighted sum of the function at these points.
+
+### Step 1: Define the Legendre Polynomial and Derivatives
+
+First, we define functions for computing the Legendre polynomial \( P_n(x) \) and its derivative, which will be used to compute the nodes and weights.
+
+```{r}
+# Compute the Legendre polynomial P_n(x) using a recurrence relation
+legendre_poly <- function(n, x) {
+  if (n == 0) {
+    return(rep(1, length(x)))
+  } else if (n == 1) {
+    return(x)
+  } else {
+    return(((2 * n - 1) * x * legendre_poly(n - 1, x) - (n - 1) * legendre_poly(n - 2, x)) / n)
+  }
+}
+
+# Compute the derivative of the Legendre polynomial P'_n(x)
+legendre_poly_derivative <- function(n, x) {
+  return(n / (1 - x^2) * (legendre_poly(n - 1, x) - x * legendre_poly(n, x)))
+}
+```
+
+
+### Step 2: Find the Roots of the Legendre Polynomial
+We will now compute the roots of the Legendre polynomial $P_n(x)$, which will serve as the quadrature nodes.
+
+```{r}
+# Newton-Raphson method to find the roots of the Legendre polynomial
+find_roots <- function(n, tol = 1e-9, max_iter = 1000) {
+  roots <- numeric(n)
+  guesses <- cos(pi * (4 * (1:n) - 1) / (4 * n + 2))  # Use the cosine approximation as initial guess
+  
+  for (i in 1:n) {
+    root <- guesses[i]
+    for (iter in 1:max_iter) {
+      Pn <- legendre_poly(n, root)
+      Pn_prime <- legendre_poly_derivative(n, root)
+      new_root <- root - Pn / Pn_prime
+      if (abs(new_root - root) < tol) {
+        roots[i] <- new_root
+        break
+      }
+      root <- new_root
+    }
+  }
+  return(roots)
+}
+```
+
+### Step 3: Compute the Weights for Each Node
+We calculate the corresponding weights using the formula:
+
+$$
+w_i=\frac{2}{\left(1-x_i^2\right)\left[P_n^{\prime}\left(x_i\right)\right]^2}
+$$
+
+```{r}
+# Compute the weights based on the roots
+compute_weights <- function(n, roots) {
+  weights <- numeric(n)
+  for (i in 1:n) {
+    weights[i] <- 2 / ((1 - roots[i]^2) * legendre_poly_derivative(n, roots[i])^2)
+  }
+  return(weights)
+}
+```
+
+```{r}
+# Gaussian Quadrature Integration
+gaussian_quadrature_non_adaptive <- function(f, a, b, n) {
+  # Step 1: Find the roots of the Legendre polynomial
+  roots <- find_roots(n)
+  
+  # Step 2: Compute the weights
+  weights <- compute_weights(n, roots)
+  
+  # Step 3: Transform the nodes and compute the integral
+  transformed_roots <- (b - a) / 2 * roots + (b + a) / 2
+  integral <- (b - a) / 2 * sum(weights * f(transformed_roots))
+  
+  return(integral)
+}
+
+# Define the function f(x) = 1 / (1 + x^2)
+f <- function(x) 1 / (1 + x^2)
+
+# Perform non-adaptive Gaussian quadrature with n = 5 nodes
+non_adaptive_result <- gaussian_quadrature_non_adaptive(f, 0, 1, 10)
+non_adaptive_result
+```
+
+
+
+
+
+
+
+## Adaptive Gaussian Quadrature
+Adaptive Gaussian quadrature applies Gaussian quadrature on subintervals and refines based on error estimates.
+
+```{r}
+# Load the package
+# Adaptive Gaussian Quadrature Integration
+adaptive_gaussian <- function(f, a, b, tol, gauss_quad, max_depth = 10, depth = 0, n = 10) {
+  m <- (a + b) / 2
+  I1 <- gauss_quad(f, a, b, n)   # Gaussian quadrature over the whole interval
+  I2 <- gauss_quad(f, a, m, n) + gauss_quad(f, m, b, n)  # Gaussian quadrature over two subintervals
+  
+  if (depth >= max_depth || abs(I2 - I1) < tol) {
+    return(I2)
+  } else {
+    return(adaptive_gaussian(f, a, m, tol/2, gauss_quad, max_depth, depth+1, n) + 
+           adaptive_gaussian(f, m, b, tol/2, gauss_quad, max_depth, depth+1, n))
+  }
+}
+
+# Apply adaptive Gaussian quadrature with tolerance = 1e-6
+adaptive_result <- adaptive_gaussian(f, 0, 1, tol = 1e-6, gaussian_quadrature_non_adaptive)
+adaptive_result
+
+```
+
+## Summary of Results
+
+```{r}
+cat("True Value: ", true_value, "\n")
+cat("Non-Adaptive Midpoint: ", midpoint_non_adaptive, "\n")
+cat("Adaptive Midpoint: ", midpoint_adaptive, "\n")
+cat("Non-Adaptive Trapezoidal: ", trapezoid_non_adaptive, "\n")
+cat("Adaptive Trapezoidal: ", trapezoid_adaptive, "\n")
+cat("Non-Adaptive Simpson: ", simpson_non_adaptive, "\n")
+cat("Adaptive Simpson: ", simpson_adaptive, "\n")
+cat("Non-Adaptive Gaussian Quadrature: ", non_adaptive_result, "\n")
+cat("Adaptive Gaussian Quadrature: ", adaptive_result, "\n")
+
+```
+
+
+## Built-in R Functions for Numerical Integration
+
+
+### Midpoint Rule
+There is no direct built-in function for the midpoint rule in base R, but you can use the `cubature::adaptIntegrate()` function, which uses an adaptive algorithm based on midpoint evaluation.
+```{r}
+# Load cubature package
+library(cubature)
+
+# Use adaptIntegrate for midpoint rule (adaptive midpoint method)
+midpoint_builtin <- adaptIntegrate(f, lowerLimit = 0, upperLimit = 1)$integral
+midpoint_builtin
+```
+
+
+### Trapezoidal Rule (Built-in Function: `pracma::trapz`)
+For the trapezoidal rule, we use the `trapz()` function from the `pracma` package.
+
+```{r}
+# Load the pracma package
+library(pracma)
+
+# Apply the trapezoidal rule using pracma's built-in function
+x_vals <- seq(0, 1, length.out = 100)  # Set up x-values
+y_vals <- f(x_vals)  # Evaluate f(x)
+trapezoid_builtin <- trapz(x_vals, y_vals)
+trapezoid_builtin
+```
+
+### Simpson’s Rule 
+For Simpson’s rule does not have built in `R` function.
+
+
+
+### Gaussian Quadrature (Built-in Function: `statmod::gauss.quad`)
+For Gaussian quadrature, we use the `gauss.quad()` function from the `statmod` package, which performs Gaussian quadrature using Legendre polynomials.
+
+```{r}
+# Load statmod package
+library(statmod)
+
+# Gaussian Quadrature using Gauss-Legendre polynomials
+gaussian_legendre_builtin <- gauss.quad(5, kind = "legendre")
+
+# Evaluate Gaussian quadrature over the interval [0,1]
+nodes <- gaussian_legendre_builtin$nodes
+weights <- gaussian_legendre_builtin$weights
+
+# Transform nodes from [-1, 1] to [0, 1]
+transformed_nodes <- (nodes + 1) / 2
+integral_gauss_legendre <- sum(weights * f(transformed_nodes)) / 2
+integral_gauss_legendre
+```
+
+
+
+
+
