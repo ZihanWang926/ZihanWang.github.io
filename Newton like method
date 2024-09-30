@@ -1,0 +1,51 @@
+# Methods
+
+## Newton's Exact Method
+
+Newton's method uses the exact Hessian matrix, which for a quadratic function is simply the matrix $A$. The update rule for Newton's method is:
+$$
+x_{k+1}=x_k-H^{-1} \nabla f\left(x_k\right)
+$$
+
+Where the Hessian $\mathrm{H}$ is constant and equal to $\mathrm{~A}$.
+
+```{r}
+# Objective and Gradient
+f <- function(x, A, b) {
+  0.5 * t(x) %*% A %*% x - t(b) %*% x
+}
+
+grad_f <- function(x, A, b) {
+  A %*% x - b
+}
+
+# Exact Hessian (Newton's Method)
+exact_hessian <- function(A) {
+  return(A)  # The Hessian is constant and equal to A
+}
+exact_hessian <- function(A) {
+  return(A)
+}
+
+newton_exact <- function(f, grad_f, x_init, A, b, tol = 1e-6, max_iter = 100) {
+  x <- x_init
+  for (i in 1:max_iter) {
+    grad <- grad_f(x, A, b)
+    if (sqrt(sum(grad^2)) < tol) return(x)
+    
+    H <- exact_hessian(A)
+    step <- solve(H) %*% grad
+    x <- x - step
+  }
+  return(x)
+}
+
+```
+
+## Secant Method
+
+The Secant method approximates the Hessian using a rank-1 update based on the difference between consecutive gradients. The update rule is:
+
+$$
+x_{k+1}=x_k-H_k^{-1} \nabla f\left(x_k\right)
+$$
