@@ -1,0 +1,150 @@
+# Homework2: Logistic and Probit Regression, Expectation-Maximization, and Numerical Integration Techniques
+
+## Task 1: Numerical Integration Techniques for e^-x^2
+
+1.  True Value of the Integral
+
+```{r}
+f <- function(x) exp(-x^2)
+true_value <- integrate(f, 0, 2)
+print(true_value)
+```
+
+2.Non-Adaptive Methods
+
+```{r}
+# Midpoint Rule
+a<-0
+b<-2
+n<-100
+f <- function(x) exp(-x^2)
+midpoint_rule <- function(f,a,b,n) {
+  h <- (b - a) / n
+  midpoints <- seq(a + h / 2, b - h / 2, length.out = n)
+  integral <- h * sum(f(midpoints))
+  return(integral)
+}
+
+# Apply the midpoint rule with n = 100 sub-intervals
+midpoint_non_adaptive <- midpoint_rule(f, 0, 1, 100)
+midpoint_non_adaptive
+```
+
+```{r}
+# Trapezoidal Rule
+# Non-Adaptive Trapezoidal Rule
+a<-0
+b<-2
+n<-100
+f <- function(x) exp(-x^2)
+trapezoid_rule <- function(f, a, b, n) {
+  h <- (b - a) / n
+  x <- seq(a, b, length.out = n + 1)
+  y <- f(x)
+  integral <- (h / 2) * (y[1] + 2 * sum(y[2:n]) + y[n+1])
+  return(integral)
+}
+
+# Apply the trapezoidal rule with n = 100 subintervals
+trapezoid_non_adaptive <- trapezoid_rule(f, 0, 1, 100)
+trapezoid_non_adaptive
+```
+
+```{r}
+# Simpson's Rule
+# Non-Adaptive Simpson's Rule
+a<-0
+b<-2
+n<-100
+f <- function(x) exp(-x^2)
+simpson_rule <- function(f, a, b, n) {
+  if (n %% 2 == 1) stop("n must be even for Simpson's rule")
+  h <- (b - a) / n
+  x <- seq(a, b, length.out = n + 1)
+  y <- f(x)
+  integral <- (h / 3) * (y[1] + 4 * sum(y[seq(2, n, 2)]) + 2 * sum(y[seq(3, n - 1, 2)]) + y[n+1])
+  return(integral)
+}
+
+# Apply Simpson's rule with n = 100 subintervals
+simpson_non_adaptive <- simpson_rule(f, 0, 1, 100)
+simpson_non_adaptive
+```
+
+```{r}
+#Gaussian Quadrature
+# Step 1: Define the Legendre Polynomial and Derivatives
+# Compute the Legendre polynomial P_n(x) using a recurrence relation
+a<-0
+b<-2
+n<-100
+f <- function(x) exp(-x^2)
+legendre_poly <- function(n, x) {
+  if (n == 0) {
+    return(rep(1, length(x)))
+  } else if (n == 1) {
+    return(x)
+  } else {
+    return(((2 * n - 1) * x * legendre_poly(n - 1, x) - (n - 1) * legendre_poly(n - 2, x)) / n)
+  }
+}
+
+# Compute the derivative of the Legendre polynomial P'_n(x)
+legendre_poly_derivative <- function(n, x) {
+  return(n / (1 - x^2) * (legendre_poly(n - 1, x) - x * legendre_poly(n, x)))
+}
+
+# Step 2: Find the Roots of the Legendre Polynomial
+# Newton-Raphson method to find the roots of the Legendre polynomial
+find_roots <- function(n, tol = 1e-9, max_iter = 1000) {
+  roots <- numeric(n)
+  guesses <- cos(pi * (4 * (1:n) - 1) / (4 * n + 2))  # Use the cosine approximation as initial guess
+  
+  for (i in 1:n) {
+    root <- guesses[i]
+    for (iter in 1:max_iter) {
+      Pn <- legendre_poly(n, root)
+      Pn_prime <- legendre_poly_derivative(n, root)
+      new_root <- root - Pn / Pn_prime
+      if (abs(new_root - root) < tol) {
+        roots[i] <- new_root
+        break
+      }
+      root <- new_root
+    }
+  }
+  return(roots)
+}
+
+# Step 3: Compute the Weights for Each Node
+# Compute the weights based on the roots
+compute_weights <- function(n, roots) {
+  weights <- numeric(n)
+  for (i in 1:n) {
+    weights[i] <- 2 / ((1 - roots[i]^2) * legendre_poly_derivative(n, roots[i])^2)
+  }
+  return(weights)
+}
+
+# Gaussian Quadrature Integration
+gaussian_quadrature_non_adaptive <- function(f, a, b, n) {
+  # Step 1: Find the roots of the Legendre polynomial
+  roots <- find_roots(n)
+  
+  # Step 2: Compute the weights
+  weights <- compute_weights(n, roots)
+  
+  # Step 3: Transform the nodes and compute the integral
+  transformed_roots <- (b - a) / 2 * roots + (b + a) / 2
+  integral <- (b - a) / 2 * sum(weights * f(transformed_roots))
+  
+  return(integral)
+}
+
+# Define the function f(x) = 1 / (1 + x^2)
+f <- function(x) 1 / (1 + x^2)
+
+# Perform non-adaptive Gaussian quadrature with n = 5 nodes
+non_adaptive_result <- gaussian_quadrature_non_adaptive(f, 0, 1, 10)
+non_adaptive_result
+```
