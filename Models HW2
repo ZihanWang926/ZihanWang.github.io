@@ -1,0 +1,42 @@
+X<-matrix(c(1,1,1,1,
+            2,5,-1,1),
+          ncol=2,byrow=FALSE)
+y<-c(4,4,5,3)
+XtX<-t(X)%*%X
+Xty<-t(X)%*%y
+XtX_inv<-solve(XtX)
+beta_hat<-XtX_inv %*% Xty
+beta_hat
+
+```
+```{r}
+```
+
+
+```{r}
+X<-matrix(c(1,1,1,1,1,
+            2,4,6,8,10),
+          ncol=2,byrow=FALSE)
+XtX<-t(X)%*%X
+XtX_inv<-solve(XtX)
+XtX_inv
+y<-c(1,2,5,7,9)
+Xty<-t(X)%*%y
+Xty
+beta_hat<-XtX_inv%*%Xty
+beta_hat
+Xt<-t(X)
+Xt
+H<-X%*%XtX_inv%*%Xt
+H
+y_hat<-X%*%beta_hat
+y_hat
+residuals<-y-y_hat
+residuals
+RSS<-sum(residuals^2)
+RSS
+n<-length(y)
+p<-ncol(X)
+sigma_squared<-RSS/(n-p)
+sigma_squared
+```
