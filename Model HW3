@@ -1,0 +1,297 @@
+---
+title: "Math 420 HW 3 solution"
+author: "Washington University in St. Louis"
+date: 'Due date: Sunday, 10/27/2024'
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+subtitle: Fall 2024
+latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require('daewr')
+require('lme4')
+require('FrF2')
+```
+
+## Instruction:
+
+Please type your answers clearly and show your work neatly. You are encouraged to use the Rmarkdown version of this assignment as a template to submit your work. Unless stated otherwise, all programming references in the assignment will be in R. For this assignment, problems roughly covers content from Fractional Factorial Designs (Ch. 6 of the text)
+
+### Problem 1 (3 points)
+
+Create a $2^{7-3}$ design using `FrF2` with generators $E = ABC, F = ABD, G = ACD$
+
+(a) Determine the defining relation for this design. Show your work.
+
+```{r}
+library(FrF2)
+
+design <- FrF2(nruns = 2^(7-3), generators = c("ABC", "ABD", "ACD"), randomize = FALSE)
+
+print(design)
+
+cat("Defining relation for the design:\n")
+cat("I = E = ABC\n")
+cat("I = F = ABD\n")
+cat("I = G = ACD\n")
+cat("I = ABCD = E * F\n")
+cat("I = ABCEFG = E * G * F\n")
+```
+
+We can see from the result that the defining relation for the design is: I = E = ABC I = F = ABD I = G = ACD I = ABCD = E \* F I = ABCEFG = E \* G \* F
+
+(b) Determine the confounded strings of two-factor interactions that can be estimated from this design.
+
+```{r}
+y <- 1:nrow(design)
+
+alias_structure <- aliases(lm(y ~ (.)^2, data = design))
+
+print(alias_structure)
+```
+
+In this $2^{7-3}$ design, all two-factor interactions are confounded, forming the alias structure as shown above. This means that no two-factor interaction can be estimated independently in this design, as all two-factor interactions are confounded with other combinations.
+
+(c) Suppose that after the analysis of data from this experiment, the significant effects appear to be $B$, $BC +AE +FG$, and $BE +AC +DG$. What foldover fraction would you recommend in order to determine which specific interactions are causing the two strings of confounded interactions to appear significant?
+
+I recommend to fold over on factor A. Because in this way, We can separate the interactions within $BC +AE +FG$ to distinguish whether $AE$or $FG$ is causing the significance and separate the interactions within $BE +AC +DG$ to determine whether $AC$ or $DG$ is responsible for the significance. This design will help us identify the specific interactions responsible for the significance in the new experiment.
+
+(d) List the experiments in the foldover fraction you recommend in part (c).
+
+```{r}
+library(FrF2)
+
+foldover_design <- fold.design(design, factor.names = "A")
+
+cat("Foldover Design on Factor A:")
+print(foldover_design)
+```
+
+### Problem 2 (3 points)
+
+6.  Consider the experiment to study factors that affect the percent removal of arsenic from drinking water using a iron coated sand filter.
+
+<!-- -->
+
+(a) Modify the R code in Section 6.5.1 to produce the design shown in Table 6.8.
+
+```{r}
+library(FrF2)
+
+design1 <- FrF2(8, 7, generators = c("AB", "AC", "BC", "ABC"), randomize = FALSE)
+
+design_folded <- fold.design(design1, columns = 'full')
+
+design1_df <- as.data.frame(design1)
+design_folded_df <- as.data.frame(design_folded)
+
+common_columns <- intersect(names(design1_df), names(design_folded_df))
+design1_df <- design1_df[, common_columns]
+design_folded_df <- design_folded_df[, common_columns]
+
+combined_design <- rbind(design1_df, design_folded_df)
+
+print(combined_design)
+```
+
+(b) Determine the defining relation for the experiments in the first block and show the confounding of main effects with strings of two-factor interactions.
+
+**Confounding Structure:** This shows the confounding of main effects with two-factor interactions: $$D = AB$$ $$E = AC$$ $$F = BC$$ $$G = ABC$$
+
+Therefore, **Defining relation** for the experiments is: $$I = ABD = ACE = BCF = ABCG$$ indicating that the main effects D,E,F,and G are confounded with the two-factor interactions AB,AC,BC,and ABC,respectively.
+
+(c) Calculate the effects and make a half-normal plot of them using only the data from block 1 in Table 6.8.
+
+```{r}
+library(FrF2)
+library(daewr)  
+
+combined_data <- data.frame(
+  Block = factor(rep(1:2, each = 8)),  
+  A = c(-1, 1, -1, 1, -1, 1, -1, 1),
+  B = c(-1, -1, 1, 1, -1, -1, 1, 1),
+  C = c(-1, -1, -1, -1, 1, 1, 1, 1),
+  D = c(1, -1, -1, 1, 1, -1, -1, 1),
+  E = c(1, 1, -1, -1, 1, 1, -1, -1),
+  F = c(1, -1, 1, -1, -1, 1, -1, 1),
+  G = c(-1, 1, 1, -1, -1, 1, 1, -1),
+  response = c(69.95, 58.65, 56.25, 53.25, 94.40, 73.45, 10.00, 2.11)
+)
+
+model <- lm(response ~ Block + A*B*C*D*E*F*G, data = combined_data)
+effects <- na.omit(coef(model)[-1])  
+
+daewr::halfnorm(effects, names(effects))
+title("Half-Normal Plot of Effects (Combined Blocks)")
+```
+
+(d) Determine the defining relation for the combined experiments.
+
+Based on the provided data and the half-normal plot, it is evident that the effects of factors B and BC are significantly higher than those of the other factors. This indicates that these factors have a substantial impact on the results of the combined experiments. Therefore, we can conclude that the defining relationship for the combined experiments is that the primary factors influencing the outcomes are B and BC, while the effects of the other factors are relatively minor.
+
+(e) Calculate the effects, including the block effect, and make a half-normal plot of them using all the data in Table 6.8. What interactions are confounded with the block effect?
+
+```{r}
+library(FrF2)
+library(daewr)
+
+combined_data <- data.frame(
+  Block = factor(rep(1:2, each = 8)), 
+  A = c(-1, 1, -1, 1, -1, 1, -1, 1, 1, -1, 1, -1, 1, -1, 1, -1),
+  B = c(-1, -1, 1, 1, -1, -1, 1, 1, 1, 1, -1, -1, 1, 1, -1, -1),
+  C = c(-1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1),
+  D = c(1, -1, -1, 1, 1, -1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1),
+  E = c(1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, 1, -1, 1, 1, -1),
+  F = c(1, -1, 1, -1, -1, 1, -1, 1, -1, 1, -1, 1, 1, -1, -1, 1),
+  G = c(-1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, 1, -1),
+  response = c(69.95, 58.65, 56.25, 53.25, 94.40, 73.45, 10.00, 2.11,
+               16.20, 52.85, 9.05, 31.1, 7.40, 9.90, 10.85, 48.75)
+)
+
+
+model <- lm(response ~ Block + A*B*C*D*E*F*G, data = combined_data)
+effects <- coef(model)[-1] 
+effects <- na.omit(effects)
+
+print("Effects (Including Block Effect):")
+print(effects)
+```
+
+```{r}
+halfnorm(abs(effects), labs = names(effects))
+
+title("Half-Normal Plot of Effects (Including Block Effect)")
+
+confounded_interactions <- "Interactions confounded with the Block effect include: A*B*C/A*D*E/B*D*F etc."
+print(confounded_interactions, cex.main = 0.4)
+```
+
+In this experimental design, the block effect is confounded with the following three-factor interactions: ABC ADE BDF. These confounding relationships mean that we cannot independently estimate the effects of these three-factor interactions, as they overlap with the block effect.
+
+### Problem 3 (4 points)
+
+8.  Prince (2007) performed a 2\^{5-2} fractional factorial in the process of optimizing a clinical assay to detect Streptococcus pyogenes with real-time PCR. Optimization of this process would allow hospitals to detect Strep infections in less than 30 minutes with $99%$ accuracy. The factors he studied were: A=Number of S. pyogenes colonies (1 or 4), B=Boiling time (1 min. or 3 min.), C=Centrifuge time (0 min. or 2 min.), D=cycling temperature (60 or 61), E=Cycling time (5/10 sec. or 8/13 sec.).
+
+The generators for the design were $D=AC$ and $E=BC$.
+
+(a) The response data (in standard order) from the eight experiments were: 1.31091, 1.43201, 1.29951, 1.37199, 1.33566, 1.46820, 1.39023, 1.41531. Calculate the effects and make a half-normal plot of the effects. Identify any effects you believe may be significant.
+
+```{r}
+library(daewr)
+
+response <- c(1.31091, 1.43201, 1.29951, 1.37199, 1.33566, 1.46820, 1.39023, 1.41531)
+
+design_matrix <- data.frame(
+  A = c(-1, 1, -1, 1, -1, 1, -1, 1),
+  B = c(-1, -1, 1, 1, -1, -1, 1, 1),
+  C = c(-1, -1, -1, -1, 1, 1, 1, 1),
+  D = c(1, -1, 1, -1, -1, 1, -1, 1),  # D = AC
+  E = c(1, -1, -1, 1, -1, 1, 1, -1)   # E = BC
+)
+
+effects <- colMeans(design_matrix * response) * 2
+
+labels <- names(effects)
+
+daewr::halfnorm(effects = effects, labs = labels, refline = TRUE, alpha = 0.05)
+```
+
+Based on the distribution of points in the plot, D,E deviates from the baseline line, indicating that they may be significant effects, while effects A,B and C may just be random fluctuations without significance.
+
+(b) Determine the confounding pattern or alias structure for the design.
+
+```{r}
+library(FrF2)
+
+design <- FrF2(nruns = 8, nfactors = 5, generators = c("AC", "BC"), randomize = FALSE)
+
+design$y <- rnorm(8)
+
+aliases(lm(y ~ (.)^3, data = design))
+```
+
+(c) What are the aliases of the largest effect in absolute value?
+
+```{r}
+max_effect_value <- max(abs(effects))
+max_effect_name <- names(effects)[which.max(abs(effects))]
+
+cat("The largest effect:", max_effect_name, "The value is:", max_effect_value, "\n")
+```
+
+(d) Prince performed eight more experiments according to a foldover (similar to that shown in Table 6.8) and the resulting data were: 1.31702, 1.38881, 1.32222, 1.36248, 1.33826, 1.32654, 1.32654, 1.34635. Combining this data with the data from the original 8 runs, calculate the 15 effects including a block effect for the differences in the two groups of experiments.
+
+```{r}
+response_original <- c(1.31091, 1.43201, 1.29951, 1.37199, 1.33566, 1.46820, 1.39023, 1.41531)
+
+response_foldover <- c(1.31702, 1.38881, 1.32222, 1.36248, 1.33826, 1.32654, 1.32654, 1.34635)
+
+response_combined <- c(response_original, response_foldover)
+
+design_matrix <- data.frame(
+  Block = c(rep(-1, 8), rep(1, 8)), 
+  A = rep(c(-1, 1, -1, 1, -1, 1, -1, 1), 2),
+  B = rep(c(-1, -1, 1, 1, -1, -1, 1, 1), 2),
+  C = rep(c(-1, -1, -1, -1, 1, 1, 1, 1), 2),
+  D = rep(c(1, -1, 1, -1, -1, 1, -1, 1), 2),  # D = AC
+  E = rep(c(1, -1, -1, 1, -1, 1, 1, -1), 2)   # E = BC
+)
+
+effects <- colMeans(design_matrix * response_combined)*2
+
+print(effects)
+```
+
+(e) What is the defining relationship and alias structure for the complete set of 16 experiments?
+
+```{r}
+library(FrF2)
+
+original_design <- FrF2(nruns = 8, nfactors = 5, generators = c("AC", "BC"), randomize = FALSE)
+
+foldover_design <- original_design
+foldover_design[] <- lapply(foldover_design, function(x) as.numeric(as.character(x)) * -1)  
+
+cat("Original design rows:", nrow(original_design), "\n")
+cat("Foldover design rows:", nrow(foldover_design), "\n")
+
+combined_design <- rbind(original_design, foldover_design)
+
+combined_design$y <- rnorm(nrow(combined_design))
+
+aliases(lm(y ~ (.)^2, data = combined_design))
+```
+
+The defining relationship:I=ACD=BCE Alias structure: A:B = D:E A:D = B:E A:E = B:D
+
+(f) Make a half-normal plot of the 15 effects and determine what appears to be significant from the combined set of data.
+
+```{r}
+library(daewr)
+
+n <- length(effects)
+
+daewr::halfnorm(effects = abs(effects), labs = names(effects), refline = TRUE, alpha = 0.05)
+
+print(effects)
+```
+
+Based on the observation from the half-normal plot, effects D and E clearly deviate from the baseline, indicating that they may be significant effects with statistically significant influence on the experiment results.
+
+(g) Provide an interpretation for all effects and interactions you determine are significant, and discuss how the conclusions and interpretation after 16 experiments differs from what could have been concluded after the first 8 experiments.
+
+**Interpretation for all effects and interactions determined significant:**
+
+*1. Interpretation of Factor D*
+
+D (Cycling Temperature): The significance of cycling temperature indicates that changes in temperature have a notable impact on detection performance. Different temperatures may alter the reaction rate or affect detection accuracy. If temperature is a key factor in optimizing the detection process, it may be essential to carefully control it within a specific range to achieve ideal results.
+
+*2.Interpretation of Factor E* E (Cycling Time): The significance of cycling time suggests that different cycling times have a measurable impact on detection outcomes. This may relate to the control of reaction timing, which can affect the completeness or efficiency of the reaction. If the detection process is time-sensitive, optimizing the cycling time can enhance both speed and accuracy. Therefore, in practical applications, ensuring precise cycling time during detection is crucial for achieving efficient and accurate results.
+
+*3. Combined Importance of D and E Joint Impact of D and E:* The significance of both D and E suggests that these two factors together may determine the success of the detection process. Effectively managing both cycling temperature and time can optimize reaction conditions, leading to improved detection accuracy and efficiency. This indicates that in setting detection parameters, prioritizing the coordination of temperature and time could yield the best detection performance.
+
+**Different of the conclusion:** In the first 8 experiments, due to the presence of confounding effects, it was challenging to independently confirm the significance of factors D and E. By adding 8 foldover experiments, we were able to disentangle some of these confounding effects, allowing us to clearly identify the individual impact of D and E. This further demonstrates the importance of conducting foldover experiments, as they make the results more interpretable and practically meaningful.
