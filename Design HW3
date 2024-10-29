@@ -2,7 +2,7 @@
 title: "Math 420 HW 3 solution"
 author: "Washington University in St. Louis"
 date: 'Due date: Sunday, 10/27/2024'
-output:
+output:https://github.com/ZihanWang926/ZihanWang.github.io/blob/main/Model%20HW3
   html_document:
     df_print: paged
   pdf_document: default
