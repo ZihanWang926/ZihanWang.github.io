@@ -1,0 +1,288 @@
+# Probit Likelihood, Gradient, and Hessian
+
+## Likelihood for Probit Regression
+
+In probit regression, the likelihood is defined based on the cumulative normal distribution function (CDF). The likelihood of observing a binary response $y \in\{0,1\}$ is modeled as:
+
+$$
+p(\mathbf{x})=\Phi(\mathbf{x} \cdot \beta)
+$$
+
+where:
+
+$\Phi(\cdot)$ is the CDF of the standard normal distribution,
+
+$\mathbf{x} \cdot \beta$ is the linear combination of the predictors and the parameters $\beta$.
+
+The log-likelihood for probit regression is given by:
+
+$$
+l(\beta)=\sum_{i=1}^n\left[y_i \log \left(\Phi\left(\mathbf{x}_i \cdot \beta\right)\right)+\left(1-y_i\right) \log \left(1-\Phi\left(\mathbf{x}_i \cdot \beta\right)\right)\right]
+$$
+
+```{r}
+# Define the logistic gradient function (for steepest ascent)
+log_likelihood_ascent <- function(beta, X, y) {
+  # Compute the linear predictor
+  linear_predictor <- X %*% beta
+  
+  # CDF of the standard normal distribution (Probit link)
+  p <- pnorm(linear_predictor)
+  
+  # Compute the log-likelihood
+  log_likelihood <- sum(y * log(p) + (1 - y) * log(1 - p))
+  
+  return(log_likelihood)
+}
+
+#log_likelihood_ascent <- function(beta, X, y) {
+ # linear_predictor <- X %*% beta
+#  p <- pnorm(linear_predictor)
+  
+  # Add a small constant to avoid log(0)
+#  p <- pmax(p, 1e-6)
+#  p <- pmin(p, 1 - 1e-6)
+  
+#  log_likelihood <- sum(y * log(p) + (1 - y) * log(1 - p))
+#  return(log_likelihood)
+#}
+
+```
+
+## Gradient of the Probit Log-likelihood
+
+The gradient of the log-likelihood is the vector of first partial derivatives with respect to each parameter $\beta_j$. For probit regression, the gradient is given by:
+
+$$
+\frac{\partial l(\beta)}{\partial \beta}=X^T(y-\Phi(\mathbf{X} \cdot \beta))
+$$
+
+where $\Phi(\mathbf{X} \cdot \beta)$ is the CDF of the normal $d \downarrow$ bution applied to the linear combination of predictors and parameters.
+
+```{r}
+# Define probit log-likelihood gradient function (for Newton's method)
+probit_log_likelihood_gradient <- function(beta, X, y) {
+  p <- pnorm(X %*% beta)
+  return(t(X) %*% (y - p))
+}
+```
+
+## Hessian of the Probit Log-likelihood
+
+The Hessian matrix is the matrix of second partial derivatives of the log-likelihood with respect to the parameters $\beta$. For probit regression, the Hessian is given by:
+
+$$
+H_{j k}=-X^T \mathbf{W} X
+$$
+
+where $\mathbf{W}$ is a diagonal matrix with elements:
+
+$$
+W_{i i}=\frac{\phi\left(\mathbf{x}_i \cdot \beta\right)^2}{\Phi\left(\mathbf{x}_i \cdot \beta\right)\left(1-\Phi\left(\mathbf{x}_i \cdot \beta\right)\right)}
+$$
+
+Here, $\phi(\cdot)$ is the PDF (probability density function) of the standard normal distribution.
+
+```{r}
+# Define probit log-likelihood Hessian function (for Newton's method)
+probit_log_likelihood_hessian <- function(beta, X) {
+  p <- pnorm(X %*% beta)
+  d <- dnorm(X %*% beta)
+  W <- diag((d^2) / (p * (1 - p) ))  # Adding small constant to avoid division by zero
+  return(-t(X) %*% W %*% X)
+}
+
+```
+
+# Simulated Data
+
+We will simulate data for binary classification using two predictors and generate a binary outcome using a probit link function. The true values of the parameters are set as $\beta_0=1, \beta_1=2$, and $\beta_2=-3$
+
+## True Parameters
+
+```{r}
+# Set true beta values
+true_betas <- c(1, 2, -3)  # True values for beta_0, beta_1, and beta_2
+```
+
+## Data Generation
+
+We will generate two random predictors and a binary outcome using the logistic link function based on the linear combination of the true parameters.
+
+```{r}
+# Simulate data for binary classification with two predictors
+set.seed(123)
+n <- 100
+X <- cbind(1, rnorm(n), rnorm(n))  # Three columns: intercept and two predictors
+linear_combination <- X %*% true_betas
+y <- ifelse(linear_combination > 0, 1, 0)  # Binary outcome
+
+```
+
+# Steepest Ascent Algorithm
+
+At each iteration, we update the parameters using the following formula:
+
+$$
+\beta^{(k+1)}=\beta^{(k)}+\alpha \nabla l\left(\beta^{(k)}\right)
+$$
+
+where $\alpha$ is the step size, and $\nabla l\left(\beta^{(k)}\right)$ is the gradient of the log-likelihood at iteration $k$.
+
+```{r}
+# Steepest ascent algorithm with fixed step size
+steepest_ascent_fixed_step <- function(X, y, beta_init, step_size = 0.01, tol = 1e-3, max_iter = 10000) {
+  beta <- beta_init
+  for (i in 1:max_iter) {
+    grad <- probit_log_likelihood_gradient(beta, X, y)
+    
+    # Check if gradient is close enough to 0 (convergence)
+    if (sum(abs(grad)) < tol) {
+      cat("Steepest ascent converged after", i, "iterations.\n")
+      cat("Estimated parameters: ", beta, "\n")
+      return(beta)
+    }
+    
+    # Update beta using a fixed step size (Ascent update)
+    beta_new <- beta + step_size * grad
+    
+    # Check for convergence based on change in beta
+    if (sum(abs(beta_new - beta)) < tol) {
+      cat("Steepest ascent converged after", i, "iterations.\n")
+      cat("Estimated parameters: ", beta_new, "\n")
+      return(beta_new)
+    }
+    
+    beta <- beta_new
+  }
+  
+  warning("Steepest ascent did not converge.")
+  cat("Estimated parameters: ", beta, "\n")
+  return(beta)
+}
+```
+
+## Backtraking
+
+```{r}
+
+
+
+
+steepest_ascent_backtracking <- function(gradient_fn, objective_fn, beta_init, X, y, step_size = 1, tol = 1e-2, max_iter = 100, alpha = 0.05) {
+  beta <- beta_init  # Initial parameters
+  for (i in 1:max_iter) {
+    # Compute gradient
+    grad <- gradient_fn(beta, X, y)
+    
+    # Check for convergence (gradient close to 0)
+    if (sum(abs(grad)) < tol) {
+      cat("Converged after", i, "iterations.\n")
+      cat("Estimated parameters: ", beta, "\n")
+      return(beta)
+    }
+    
+    # Step size for this iteration
+    current_step_size <- step_size
+    
+    # Update parameter using gradient
+    beta_new <- beta + current_step_size * grad
+    
+    # Backtracking loop: Reduce step size if objective function does not improve
+    
+    while ((objective_fn(beta_new, X, y)) < (objective_fn(beta, X, y))) {
+      current_step_size <- current_step_size * alpha  # Reduce step size
+      beta_new <- beta + current_step_size * grad
+    }
+    
+    # Check for convergence based on change in beta
+    if (sum(abs(beta_new - beta)) < tol) {
+      cat("Converged after", i, "iterations.\n")
+      cat("Estimated parameters: ", beta_new, "\n")
+      return(beta_new)
+    }
+    
+    # Update beta
+    beta <- beta_new
+    print(beta)
+  }
+  
+  warning("Did not converge within the maximum number of iterations.")
+  return(beta)
+}
+
+
+
+```
+
+# Newton's Method
+
+At each iteration, the parameters are updated using:
+
+$$
+\beta^{(k+1)}=\beta^{(k)}-H\left(\beta^{(k)}\right)^{-1} \nabla l\left(\beta^{(k)}\right)
+$$
+
+where $H\left(\beta^{(k)}\right)$ is the Hessian matrix and $\nabla l\left(\beta^{(k)}\right)$ is the gradient of the log-likelihood.
+
+```{r}
+# Newton's method for probit regression
+newtons_method_probit <- function(X, y, beta_init, tol = 1e-6, max_iter = 100) {
+  beta <- beta_init
+  for (i in 1:max_iter) {
+    grad <- probit_log_likelihood_gradient(beta, X, y)
+    H <- probit_log_likelihood_hessian(beta, X)
+    
+    # Check if Hessian is singular or ill-conditioned
+    if (any(is.nan(H)) || any(is.infinite(H))) {
+      cat("Newton's method failed due to singular or ill-conditioned Hessian after", i, "iterations.\n")
+      return(beta)
+    }
+    
+    # Update using Newton's method
+    beta_new <- beta - solve(H) %*% grad
+    
+    # Check for convergence based on change in beta
+    if (sum(abs(beta_new - beta)) < tol) {
+      cat("Newton's method converged after", i, "iterations.\n")
+      cat("Estimated parameters: ", beta_new, "\n")
+      return(beta_new)
+    }
+    
+    beta <- beta_new
+  }
+  
+  warning("Newton's method did not converge")
+  cat("Estimated parameters: ", beta, "\n")
+  return(beta)
+}
+```
+
+# Comparing Estimated and True Betas
+
+Finally, we compare the estimated betas from Steepest Ascent and Newton's Method to the true values.
+
+```{r}
+beta_init <- c(1.8,3.6,20.5)
+# Running Steepest Ascent
+cat("Running Steepest Ascent:\n")
+beta_steepest <- steepest_ascent_fixed_step(X, y, beta_init, step_size = 0.00022)
+beta_init <- c(6.9,1.8,-2.8)
+# Call Steepest Ascentwith Backtracking
+#beta_steepest_backtracking <- steepest_ascent_backtracking(
+ # gradient_fn = probit_log_likelihood_gradient,
+#  objective_fn = log_likelihood_ascent,
+#  beta_init = beta_init,
+#  X = X,
+#  y = y,step_size = 0.02
+#)
+
+cat("Running Newton's Method:\n")
+#beta_newton <- tryCatch({
+ # newtons_method_probit(X, y, beta_init)
+#}, error = function(e) cat("Newton's method failed: ", e, "\n"))
+
+
+# Print the true betas
+cat("True beta values: ", true_betas, "\n")
+```
