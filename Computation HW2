@@ -70,7 +70,7 @@ simpson_rule <- function(f, a, b, n) {
 simpson_non_adaptive <- simpson_rule(f, 0, 1, 100)
 simpson_non_adaptive
 ```
-
+# Another way
 ```{r}
 #Gaussian Quadrature
 # Step 1: Define the Legendre Polynomial and Derivatives
